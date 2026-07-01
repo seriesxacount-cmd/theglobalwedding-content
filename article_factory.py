@@ -1,0 +1,118 @@
+# -*- coding: utf-8 -*-
+"""Фабрика статей на Gemini: ПИСАТЕЛЬ -> ПРОВЕРКА(редактор) -> цикл FAIL->переписать.
+Настройки проекта — в config.json. Ключ — env GEMINI_API_KEY или .env.
+Запуск (тест одной статьи): python article_factory.py "тема статьи" """
+import sys, json, re, urllib.request, urllib.error
+from factory_config import CFG, gemini_key
+
+KEY = gemini_key()
+MODEL = CFG.get("gemini_model", "gemini-2.5-flash")
+URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent?key={KEY}"
+
+def gemini(prompt, temperature=0.7):
+    body = {"contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": temperature, "maxOutputTokens": 8192}}
+    req = urllib.request.Request(URL, data=json.dumps(body).encode("utf-8"),
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=120) as r:
+        d = json.loads(r.read().decode("utf-8"))
+    return d["candidates"][0]["content"]["parts"][0]["text"]
+
+# --- анти-нейронные редакторские правила (универсальные) ---
+ANTI_NEURAL = """ПРАВИЛА ЖИВОГО ЯЗЫКА (чтобы текст НЕ звучал как нейросеть — соблюдай строго):
+- Никакого антропоморфизма: рынок, цена, спрос, отрасль, день — не «дышат», не «решают», не «просыпаются». Только конкретные действия людей и факты.
+- Без «правила трёх»: не ставь три эпитета или три однородных пункта подряд ради ритма.
+- Убери пафосные слова-«значимости»: «жест», «сдвиг», «манифест», «веха», «драйвер», «вызов», «ландшафт»/«экосистема» в переносном смысле.
+- Предлог «про» НЕ в значении «о»: пиши «статья о X», «это влияет на качество» — НЕ «статья про X».
+- Минимум длинных тире; без штампов: «в современном мире», «играет важную роль», «широкий спектр», «на сегодняшний день», «неотъемлемая часть»."""
+
+WRITER_PROMPT = """Ты — автор блога свадебного агентства {company} — {niche}.
+Напиши экспертную статью для блога на тему: «{{topic}}».
+
+Требования:
+- Аудитория: {audience}.
+- Пиши от лица команды агентства («мы», «наша команда»), а не одного человека лично. Тон экспертный и тёплый, но по делу.
+- ЗАПРЕЩЕНЫ слова «премиум», «элитный», «люксовый», «эксклюзивный», вода, штампы и пустые обещания. Никаких «были — стали» и «не А, а Б».
+- Пиши про Санкт-Петербург и Ленинградскую область (наш регион работы).
+- Только проверяемые факты. Если не уверен в цене/названии площадки/цифре — пиши обобщённо, НЕ выдумывай конкретные цены, названия ресторанов, имена подрядчиков и характеристики.
+- Объём 2500–4000 знаков. Структура: вводный абзац, 3–5 подзаголовков, в конце — мягкий призыв обратиться в агентство.
+- Упомяни агентство естественно 1–2 раза.
+- ССЫЛКИ (только эти URL, другие НЕ выдумывай): один раз в тексте — <a href="{catalog_url}">портфолио {company}</a>; в конце — призыв со ссылкой <a href="{home_url}">{company}</a> и телефоном {phone}.
+
+{anti}
+
+Верни СТРОГО в формате:
+TITLE: <заголовок статьи, до 70 знаков, без кавычек>
+---
+<тело статьи в чистом HTML: <h2>, <p>, <ul><li>, <a>. Без <html>/<body>, без стилей.>""".format(
+    company=CFG["company"], niche=CFG["niche_desc"], audience=CFG["audience"],
+    catalog_url=CFG["catalog_url"], home_url=CFG["home_url"], phone=CFG["phone"], anti=ANTI_NEURAL)
+
+CHECKER_PROMPT = """Ты — строгий редактор блога {company}. Проверь статью на тему «{{topic}}».
+
+Статья:
+{{article}}
+
+Проверь:
+1. ФАКТЫ: нет ли выдуманных стандартов/цифр/характеристик. Помечай сомнительное.
+2. БЕЗОПАСНОСТЬ/КОРРЕКТНОСТЬ: нет ли неверных или опасных рекомендаций.
+3. ТОН: нет ли «премиум/элитный/люксовый/эксклюзивный», воды, кликбейта, пустых обещаний, «были—стали», «не А, а Б». Речь от лица команды агентства, не одного человека.
+4. ПОЛЬЗА: статья реально полезна читателю, а не пустая.
+5. ЖИВОЙ ЯЗЫК (анти-нейросеть): антропоморфизм, «правило трёх», пафосные слова, «про» вместо «о», штампы, злоупотребление тире.
+
+Верни СТРОГО валидный JSON (без markdown-обёртки):
+{{{{"verdict": "PASS" или "FAIL", "score": <0-100>, "issues": ["..."], "fixes": ["..."]}}}}
+Ставь FAIL при выдуманных фактах, опасных советах, нарушенном тоне или «нейронном» стиле.""".format(company=CFG["company"])
+
+REWRITER_PROMPT = """Ты — технический автор компании {company}. Отредактируй свою статью на тему «{{topic}}», устранив ВСЕ замечания редактора. Сохрани структуру, ссылки, объём и живой язык.
+
+Замечания (обязательно исправить):
+{{fixes}}
+
+Текущая статья:
+{{article}}
+
+Верни СТРОГО в формате:
+TITLE: <заголовок>
+---
+<исправленное тело в чистом HTML>""".format(company=CFG["company"])
+
+def parse_article(text):
+    m = re.search(r'TITLE:\s*(.+?)\s*\n-{3,}\s*\n(.+)', text, re.S)
+    return (m.group(1).strip(), m.group(2).strip()) if m else ("(без заголовка)", text.strip())
+
+def write_article(topic):
+    return parse_article(gemini(WRITER_PROMPT.format(topic=topic), 0.7))
+
+def check_article(topic, title, html):
+    raw = gemini(CHECKER_PROMPT.format(topic=topic, article=title + "\n" + html), 0.2)
+    raw = re.sub(r'^```json|```$', '', raw.strip(), flags=re.M).strip()
+    try:
+        return json.loads(raw)
+    except Exception:
+        return {"verdict": "FAIL", "score": 0, "issues": ["не распарсил ответ проверки"], "fixes": [raw[:300]]}
+
+def rewrite_article(topic, title, html, fixes):
+    ftxt = "\n".join("- " + f for f in fixes)
+    return parse_article(gemini(REWRITER_PROMPT.format(topic=topic, fixes=ftxt, article=title + "\n" + html), 0.5))
+
+def produce(topic, max_rewrites=1, log=lambda m: None):
+    title, html = write_article(topic)
+    v = check_article(topic, title, html)
+    rounds = 0
+    while v.get("verdict") != "PASS" and rounds < max_rewrites:
+        log(f"  FAIL ({v.get('score')}) → переписываю по замечаниям...")
+        title, html = rewrite_article(topic, title, html, v.get("fixes") or v.get("issues") or [])
+        v = check_article(topic, title, html); rounds += 1
+    return {"status": v.get("verdict"), "title": title, "html": html, "verdict": v, "rounds": rounds}
+
+if __name__ == "__main__":
+    if not KEY:
+        print("НЕТ КЛЮЧА: задай GEMINI_API_KEY в .env или окружении."); sys.exit(1)
+    topic = sys.argv[1] if len(sys.argv) > 1 else "Тестовая тема"
+    print("ТЕМА:", topic, "\nпишу+проверяю...", flush=True)
+    r = produce(topic, log=lambda m: print(m, flush=True))
+    v = r["verdict"]
+    print(f"\nСТАТУС: {r['status']} | {v.get('score')}/100 | переписей: {r['rounds']}")
+    print("Проблемы:", v.get("issues"))
+    print("\nЗАГОЛОВОК:", r["title"], "\nДЛИНА:", len(re.sub('<[^>]+>', '', r["html"])), "знаков")

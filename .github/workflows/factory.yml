@@ -1,0 +1,66 @@
+name: content-factory
+
+on:
+  schedule:
+    # 3 раза в день. Время в UTC. Пример: 05/12/14 UTC = 08/15/17 МСК.
+    # Меняй под свой часовой пояс. https://crontab.guru
+    - cron: '0 5,12,14 * * *'
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Зависимости
+        run: |
+          python -m pip install --quiet pillow
+          sudo apt-get update -qq && sudo apt-get install -y -qq fonts-dejavu-core || true
+
+      - name: Написать статью (по расписанию/вручную, не на push)
+        if: github.event_name != 'push'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python run_factory.py
+
+      - name: Пересобрать фид
+        run: |
+          mkdir -p public
+          python gen_feed.py public/feed.xml
+          cp index.html public/index.html
+
+      - name: Закоммитить результат
+        run: |
+          git config user.name "content-factory"
+          git config user.email "factory@users.noreply.github.com"
+          git add generated state.json public/articles public/covers/gen public/feed.xml 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "нет изменений"
+          else
+            git commit -m "auto: обновление контента [skip ci]"
+            git push
+          fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - id: deployment
+        uses: actions/deploy-pages@v4

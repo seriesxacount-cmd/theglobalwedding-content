@@ -1,0 +1,24 @@
+{
+  "company": "Global Wedding & Event",
+  "brand_display": "THE GLOBAL WEDDING",
+  "brand_line": "свадебное агентство · Санкт-Петербург",
+  "niche_desc": "свадебное агентство: организация свадеб под ключ в Санкт-Петербурге (камерные, городские и загородные торжества)",
+  "audience": "пары, которые готовят свадьбу в Санкт-Петербурге — камерные, городские и загородные торжества на 20–50 гостей",
+  "home_url": "https://theglobalwedding.com/",
+  "catalog_url": "https://theglobalwedding.com/",
+  "phone": "8-911-127-86-53",
+  "email": "theglobalwedding@mail.ru",
+
+  "site_url": "https://seriesxacount-cmd.github.io/theglobalwedding-content",
+  "feed_title": "Global Wedding & Event — блог о свадьбах в Санкт-Петербурге",
+  "feed_desc": "Статьи для пар: как подготовить свадьбу в Санкт-Петербурге — бюджет, площадки, организатор, тайминг. Свадебное агентство, с 2014 года 350+ свадеб.",
+
+  "tilda_rss": "",
+
+  "gemini_model": "gemini-2.5-flash",
+  "colors": { "top": [13, 13, 13], "bottom": [26, 22, 16], "accent": [206, 168, 96] },
+  "cover_mark": "assets/mark_white.png",
+  "cover_mark_transparent": "assets/mark_transparent.png",
+
+  "schedule_note": "Расписание задаётся в .github/workflows/factory.yml (cron, UTC). 3x/день по умолчанию."
+}
