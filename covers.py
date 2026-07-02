@@ -1,20 +1,27 @@
 # -*- coding: utf-8 -*-
-"""Брендовая обложка статьи The Global Wedding: чёрный фон, белый заголовок,
-золотой акцент, логотип-леттеринг внизу. Цвета/лого — из config.json."""
+"""Брендовая обложка статьи The Global Wedding. Фон/акцент — из config.json.
+Авто-режим: светлый фон → тёмный заголовок и чёрный логотип; тёмный фон → белый текст и белый логотип."""
 import os
 from PIL import Image, ImageDraw, ImageFont
 from factory_config import CFG, HERE
 
 ASSETS = os.path.join(HERE, "assets")
 FONT_DIR = os.path.join(ASSETS, "fonts")
-MARK_W = os.path.join(HERE, CFG.get("cover_mark", "assets/mark_white.png"))
+MARK_LIGHT = os.path.join(HERE, CFG.get("cover_mark", "assets/mark_white.png"))       # белый лого (для тёмного фона)
+MARK_DARK = os.path.join(HERE, CFG.get("cover_mark_dark", "assets/mark_black.png"))    # чёрный лого (для светлого фона)
 W, H, PAD = 1536, 864, 96
 _c = CFG.get("colors", {})
-TOP = tuple(_c.get("top", [13, 13, 13]))
-BOTTOM = tuple(_c.get("bottom", [26, 22, 16]))
-ACCENT = tuple(_c.get("accent", [206, 168, 96]))
+TOP = tuple(_c.get("top", [255, 255, 255]))
+BOTTOM = tuple(_c.get("bottom", [244, 244, 244]))
+ACCENT = tuple(_c.get("accent", [190, 150, 78]))
 BRAND = CFG.get("brand_display", "БРЕНД")
 BRAND_LINE = CFG.get("brand_line", "")
+
+# яркость фона → выбор цвета текста и логотипа
+_lum = (0.299*TOP[0] + 0.587*TOP[1] + 0.114*TOP[2] + 0.299*BOTTOM[0] + 0.587*BOTTOM[1] + 0.114*BOTTOM[2]) / 2
+LIGHT_BG = _lum > 140
+TEXT = (26, 26, 26) if LIGHT_BG else (245, 245, 245)
+MARK = MARK_DARK if LIGHT_BG else MARK_LIGHT
 
 def font(sz, bold=True):
     fn = "Font-Bold.ttf" if bold else "Font-Regular.ttf"
@@ -63,15 +70,15 @@ def render_cover(title, out):
     # золотая полоска-акцент над заголовком
     d.rectangle((PAD, y-42, PAD+96, y-32), fill=ACCENT)
     for ln in lines:
-        d.text((PAD, y), ln, font=fnt, fill=(245, 245, 245)); y += lh
+        d.text((PAD, y), ln, font=fnt, fill=TEXT); y += lh
     # нижний бренд-блок: логотип-леттеринг слева
     mh = 66; ly = H-mh-58
-    if os.path.exists(MARK_W):
-        m = Image.open(MARK_W).convert("RGBA")
+    if os.path.exists(MARK):
+        m = Image.open(MARK).convert("RGBA")
         mw = int(m.width*mh/m.height); m = m.resize((mw, mh))
         img.alpha_composite(m, (PAD, ly))
     else:
-        d.text((PAD, ly+4), BRAND, font=font(54), fill=(255, 255, 255))
+        d.text((PAD, ly+4), BRAND, font=font(54), fill=TEXT)
     # подпись справа — золотым
     if BRAND_LINE:
         blf = font(28, bold=False); blw = d.textlength(BRAND_LINE, font=blf)

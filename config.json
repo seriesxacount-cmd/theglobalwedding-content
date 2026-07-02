@@ -16,9 +16,9 @@
   "tilda_rss": "",
 
   "gemini_model": "gemini-2.5-flash",
-  "colors": { "top": [13, 13, 13], "bottom": [26, 22, 16], "accent": [206, 168, 96] },
+  "colors": { "top": [255, 255, 255], "bottom": [244, 244, 244], "accent": [190, 150, 78] },
   "cover_mark": "assets/mark_white.png",
-  "cover_mark_transparent": "assets/mark_transparent.png",
+  "cover_mark_dark": "assets/mark_black.png",
 
   "schedule_note": "Расписание задаётся в .github/workflows/factory.yml (cron, UTC). 3x/день по умолчанию."
 }
