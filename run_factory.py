@@ -39,7 +39,7 @@ h2{font-size:22px;margin:28px 0 8px;color:#111}a{color:#9a7b3f}
 <div class="top"><div class="wrap"><b>__BRAND__</b> · __BRANDLINE__</div></div>
 <div class="wrap"><img class="cover" src="../covers/gen/__SLUG__.png" alt="__TITLE__">
 <h1>__TITLE__</h1>__BODY__
-<div class="foot">__COMPANY__.<br>🌐 <a href="__HOME__">__HOME__</a> · ☎ __PHONE__ · ✉ __EMAIL__</div>
+<div class="foot">__COMPANY__ · Санкт-Петербург</div>
 </div></body></html>"""
 
 def main():
