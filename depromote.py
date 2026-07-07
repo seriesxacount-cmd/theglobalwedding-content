@@ -5,6 +5,7 @@ import os, re, glob
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GEN = os.path.join(HERE, "generated")
+PUBART = os.path.join(HERE, "public", "articles")
 
 # маркеры рекламных абзацев (регистронезависимо)
 PROMO = re.compile(
@@ -31,7 +32,7 @@ def clean(html):
     html = re.sub(r'\s{2,}', ' ', html)
     return html.strip()
 
-for f in glob.glob(os.path.join(GEN, "*.html")):
+for f in glob.glob(os.path.join(GEN, "*.html")) + glob.glob(os.path.join(PUBART, "*.html")):
     src = open(f, encoding="utf-8").read()
     out = clean(src)
     plain_before = len(re.sub('<[^>]+>', '', src))
